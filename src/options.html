@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Easy Apply Copilot Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="card">
+        <h1>Easy Apply Copilot Settings</h1>
+        <p>
+          Enter your source experience markdown and bridge settings. The extension calls a local
+          Copilot bridge powered by @github/copilot-sdk.
+        </p>
+
+        <form id="settingsForm">
+          <label>
+            Copilot Bridge Endpoint
+            <input id="bridgeUrl" type="url" placeholder="http://127.0.0.1:8787/ai/json" required />
+          </label>
+
+          <label>
+            GitHub Token (PAT with Copilot Requests permission)
+            <input id="githubToken" type="password" autocomplete="off" placeholder="github_pat_..." />
+          </label>
+
+          <div class="actions auth-actions">
+            <button type="button" id="verifyAuthBtn">Verify GitHub Authorization</button>
+            <button type="button" id="openPatPageBtn" class="ghost">Open Token Creation Page</button>
+          </div>
+
+          <label>
+            Model
+            <input id="model" type="text" placeholder="gpt-5-mini" required />
+          </label>
+
+          <label>
+            Attach Experience Markdown Files (.md, multiple allowed)
+            <input id="resumeFiles" type="file" accept=".md,text/markdown" multiple />
+          </label>
+
+          <div class="actions">
+            <button type="button" id="clearFilesBtn" class="ghost">Clear Attached Files</button>
+          </div>
+
+          <div id="resumeFilesList" class="file-list">No files attached yet.</div>
+
+          <label>
+            Additional Markdown Notes (optional)
+            <textarea id="resumeSource" rows="8" placeholder="# Notes\nAnything not in your attached files."></textarea>
+          </label>
+
+          <label>
+            Truthful Q&A Knowledge Base (optional JSON)
+            <textarea
+              id="qaHints"
+              rows="8"
+              placeholder='{"workAuthorization":"Authorized to work in the US, no sponsorship needed.","salary":"Open to market-competitive compensation."}'
+            ></textarea>
+          </label>
+
+          <label class="inline">
+            <input id="allowAutoSubmit" type="checkbox" />
+            Allow clicking final Submit buttons automatically (use carefully)
+          </label>
+
+          <h2>Assist Options</h2>
+
+          <label class="inline">
+            <input id="assistUnfollowStayUpToDate" type="checkbox" />
+            Unfollow "stay up to date" checkbox during apply
+          </label>
+
+          <label class="inline">
+            <input id="assistSubmitForm" type="checkbox" />
+            Submit form automatically
+          </label>
+
+          <label class="inline">
+            <input id="assistAutofill" type="checkbox" />
+            Autofill unfilled fields based on resume analysis
+          </label>
+
+          <label class="inline">
+            <input id="assistTailorResume" type="checkbox" />
+            Tailor resume before assist (otherwise use most recent)
+          </label>
+
+          <div class="actions">
+            <button type="submit">Save Settings</button>
+            <span id="status"></span>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

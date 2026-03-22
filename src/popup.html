@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Easy Apply Copilot</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <h1>Easy Apply Copilot</h1>
+      <p class="subtitle">Analyze this job, tailor your resume, and assist filling the form.</p>
+
+      <div class="actions">
+        <button id="assistBtn">Assist Easy Apply Form</button>
+      </div>
+
+      <section>
+        <h2>Assist Options</h2>
+        <label class="inline">
+          <input id="assistUnfollowStayUpToDate" type="checkbox" />
+          Unfollow "stay up to date" checkbox
+        </label>
+        <label class="inline">
+          <input id="assistSubmitForm" type="checkbox" />
+          Submit form automatically
+        </label>
+        <label class="inline">
+          <input id="assistAutofill" type="checkbox" />
+          Autofill unfilled fields based on resume analysis
+        </label>
+        <label class="inline">
+          <input id="assistTailorResume" type="checkbox" />
+          Tailor resume before assist (otherwise use most recent)
+        </label>
+      </section>
+
+      <div class="footer">
+        <button id="openOptions" class="ghost">Open Settings</button>
+      </div>
+    </main>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

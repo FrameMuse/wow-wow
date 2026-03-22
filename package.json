@@ -1,0 +1,9 @@
+{
+  "name": "easy-apply-copilot",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@github/copilot-sdk": "latest"
+  }
+}

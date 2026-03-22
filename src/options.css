@@ -1,0 +1,108 @@
+:root {
+  --bg: #ece7d5;
+  --ink: #1b2a33;
+  --card: #fffdf5;
+  --line: #cfccb9;
+  --accent: #005f73;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font: 15px/1.45 "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: linear-gradient(145deg, #f3efe2, var(--bg));
+}
+
+.layout {
+  max-width: 980px;
+  margin: 28px auto;
+  padding: 0 16px 24px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 15px 40px rgba(26, 42, 51, 0.08);
+}
+
+h1 {
+  margin-top: 0;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+}
+
+form {
+  display: grid;
+  gap: 14px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline input {
+  width: auto;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.file-list {
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+  font-size: 14px;
+  min-height: 44px;
+  white-space: pre-wrap;
+}
+
+button {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.ghost {
+  background: #fff;
+  color: #19414c;
+  border-color: var(--line);
+}
+
+#status {
+  color: #1e5f35;
+  font-weight: 600;
+}
