@@ -46,7 +46,7 @@ async function loadSettings() {
 
   resumeDocs = Array.isArray(localData[RESUME_DOCS_KEY]) ? localData[RESUME_DOCS_KEY] : [];
 
-  controls.bridgeUrl.value = data.bridgeUrl;
+  controls.bridgeUrl.value = data.bridgeUrl || DEFAULTS.bridgeUrl;
   controls.githubToken.value = data.githubToken || "";
   controls.model.value = data.model;
   controls.resumeSource.value = data.resumeSource;

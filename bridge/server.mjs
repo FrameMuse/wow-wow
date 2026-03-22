@@ -1,66 +1,14 @@
 import http from "node:http";
-import { fileURLToPath } from "node:url";
+import { CopilotClient, approveAll } from "@github/copilot-sdk";
 
 const HOST = process.env.COPILOT_BRIDGE_HOST || "127.0.0.1";
 const PORT = Number(process.env.COPILOT_BRIDGE_PORT || 8787);
 
-function platformPackageName() {
-  const platformMap = {
-    linux: "linux",
-    darwin: "darwin",
-    win32: "win32"
-  };
-
-  const archMap = {
-    x64: "x64",
-    arm64: "arm64"
-  };
-
-  const p = platformMap[process.platform];
-  const a = archMap[process.arch];
-  if (!p || !a) {
-    return null;
-  }
-
-  return `@github/copilot-${p}-${a}`;
-}
-
-function resolveCliPath() {
-  const pkg = platformPackageName();
-  if (!pkg) {
-    return "copilot";
-  }
-
-  try {
-    const resolved = import.meta.resolve(pkg);
-    return fileURLToPath(resolved);
-  } catch {
-    return "copilot";
-  }
-}
-
-const COPILOT_CLI_PATH = resolveCliPath();
 const warmClients = new Map();
 
 function getClientKey(githubToken) {
   const trimmed = String(githubToken || "").trim();
   return trimmed ? `token:${trimmed}` : "logged-in";
-}
-
-async function loadSdkModule() {
-  const candidates = ["@github/copilot-sdk"];
-  const errors = [];
-
-  for (const name of candidates) {
-    try {
-      const module = await import(name);
-      return { module, name };
-    } catch (error) {
-      errors.push(`${name}: ${error.message}`);
-    }
-  }
-
-  throw new Error(`Could not import Copilot SDK module. Tried ${candidates.join(", ")}. ${errors.join(" | ")}`);
 }
 
 function readBody(request) {
@@ -91,7 +39,7 @@ function writeJson(response, statusCode, data) {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type,X-GitHub-Token",
-    "Access-Control-Allow-Methods": "POST,OPTIONS"
+    "Access-Control-Allow-Methods": "POST,OPTIONS,GET"
   });
   response.end(JSON.stringify(data));
 }
@@ -142,23 +90,16 @@ function extractTextContent(value) {
   return "";
 }
 
-async function callSdkWithAdapter(sdkModule, requestData) {
-  const { module, name } = sdkModule;
+async function callSdk(requestData) {
   const { model, systemPrompt, userPrompt, githubToken } = requestData;
 
-  if (!module.CopilotClient || !module.approveAll) {
-    throw new Error(
-      `Unsupported ${name} export shape. Expected CopilotClient and approveAll. Exported keys: ${Object.keys(module).join(", ")}`
-    );
-  }
-
-  const client = await getOrCreateWarmClient(module, githubToken);
+  const client = await getOrCreateWarmClient(githubToken);
   let session;
 
   try {
     session = await client.createSession({
       model: model || "gpt-5-mini",
-      onPermissionRequest: module.approveAll,
+      onPermissionRequest: approveAll,
       systemMessage: {
         mode: "replace",
         content: String(systemPrompt || "You are a helpful assistant.")
@@ -185,9 +126,7 @@ async function callSdkWithAdapter(sdkModule, requestData) {
   }
 }
 
-const sdkModulePromise = loadSdkModule();
-
-async function getOrCreateWarmClient(CopilotModule, githubToken) {
+async function getOrCreateWarmClient(githubToken) {
   const key = getClientKey(githubToken);
   const existing = warmClients.get(key);
 
@@ -201,10 +140,10 @@ async function getOrCreateWarmClient(CopilotModule, githubToken) {
   }
 
   const clientOptions = githubToken?.trim()
-    ? { cliPath: COPILOT_CLI_PATH, githubToken: githubToken.trim(), useLoggedInUser: false }
-    : { cliPath: COPILOT_CLI_PATH, useLoggedInUser: true };
+    ? { githubToken: githubToken.trim(), useLoggedInUser: false }
+    : { useLoggedInUser: true };
 
-  const client = new CopilotModule.CopilotClient(clientOptions);
+  const client = new CopilotClient(clientOptions);
   await client.start();
   warmClients.set(key, client);
   return client;
@@ -219,35 +158,24 @@ async function stopAllWarmClients() {
 async function handleAuthCheck(request, response) {
   const token = getGitHubToken(request);
   const usedToken = applyGitHubToken(token);
-  const sdkModule = await sdkModulePromise;
 
-  if (!sdkModule.module.CopilotClient) {
-    throw new Error("CopilotClient export not found in @github/copilot-sdk.");
+  const clientOptions = usedToken ? token.trim() : "";
+
+  const client = await getOrCreateWarmClient(clientOptions);
+  const auth = await client.getAuthStatus();
+  if (!auth?.isAuthenticated) {
+    throw new Error(auth?.statusMessage || "GitHub is not authenticated for Copilot.");
   }
 
-  const clientOptions = usedToken
-    ? token.trim()
-    : "";
-
-  const client = await getOrCreateWarmClient(sdkModule.module, clientOptions);
-  try {
-    const auth = await client.getAuthStatus();
-    if (!auth?.isAuthenticated) {
-      throw new Error(auth?.statusMessage || "GitHub is not authenticated for Copilot.");
-    }
-
-    writeJson(response, 200, {
-      ok: true,
-      authorized: true,
-      usedToken,
-      authType: auth.authType || "unknown",
-      login: auth.login || null,
-      host: auth.host || null,
-      statusMessage: auth.statusMessage || "Authenticated"
-    });
-  } finally {
-    // Keep warm client alive for faster subsequent requests.
-  }
+  writeJson(response, 200, {
+    ok: true,
+    authorized: true,
+    usedToken,
+    authType: auth.authType || "unknown",
+    login: auth.login || null,
+    host: auth.host || null,
+    statusMessage: auth.statusMessage || "Authenticated"
+  });
 }
 
 const server = http.createServer(async (request, response) => {
@@ -278,8 +206,7 @@ const server = http.createServer(async (request, response) => {
   try {
     applyGitHubToken(getGitHubToken(request));
     const requestData = await readBody(request);
-    const sdkModule = await sdkModulePromise;
-    const content = await callSdkWithAdapter(sdkModule, {
+    const content = await callSdk({
       model: requestData.model || "gpt-5-mini",
       systemPrompt: String(requestData.systemPrompt || ""),
       userPrompt: String(requestData.userPrompt || ""),
@@ -305,7 +232,6 @@ const server = http.createServer(async (request, response) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`Copilot bridge listening on http://${HOST}:${PORT}/ai/json`);
-  console.log(`Copilot CLI path: ${COPILOT_CLI_PATH}`);
 });
 
 process.on("SIGINT", async () => {

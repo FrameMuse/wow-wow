@@ -524,7 +524,20 @@ function assessScamSignals({ title, company, description, url, ghostAssessment }
     "high-volume hiring"
   ];
 
-  const knownQuestionableCompanies = ["mercor", "micro1", "crossing hurdles"];
+  const knownQuestionableCompanies = [
+    "mercor", 
+    "micro1", 
+    "crossing hurdles",
+    "g2 recruitment",
+    "vivid resourcing",
+    "enzo tech group",
+    "ngage",
+    "asugo",
+    "cingalium",
+    "onesource consulting",
+    "apollo solutions",
+    "interex"
+  ];
 
   const domainAi = domains.some((domain) => domain.endsWith(".ai"));
   const knownCompanyMention = includesAny(merged, knownQuestionableCompanies);
