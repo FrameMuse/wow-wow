@@ -1363,6 +1363,170 @@ const riskStrings = {
   grift: "Grift (Gambling/Blockchain)",
 }
 
+const skillMatchers = [
+  { label: ".NET", patterns: [/\b\.net\b/i, /\bdotnet\b/i] },
+  { label: "C#", patterns: [/\bc#\b/i, /\bcsharp\b/i] },
+  { label: "TypeScript (TS)", patterns: [/\btypescript\b/i, /\bts\b/i] },
+  { label: "JavaScript", patterns: [/\bjavascript\b/i, /\bjs\b/i] },
+  { label: "Node.js", patterns: [/\bnode\.js\b/i, /\bnodejs\b/i] },
+  { label: "React", patterns: [/\breact\b/i] },
+  { label: "Angular", patterns: [/\bangular\b/i] },
+  { label: "Vue", patterns: [/\bvue\b/i] },
+  { label: "Python", patterns: [/\bpython\b/i] },
+  { label: "Java", patterns: [/\bjava\b/i] },
+  { label: "Go", patterns: [/\bgolang\b/i, /\bgo\b/i] },
+  { label: "SQL", patterns: [/\bsql\b/i, /\bpostgres\b/i, /\bmysql\b/i] },
+  { label: "AWS", patterns: [/\baws\b/i, /\bamazon web services\b/i] },
+  { label: "Azure", patterns: [/\bazure\b/i] },
+  { label: "GCP", patterns: [/\bgcp\b/i, /\bgoogle cloud\b/i] },
+  { label: "Docker", patterns: [/\bdocker\b/i] },
+  { label: "Kubernetes", patterns: [/\bkubernetes\b/i, /\bk8s\b/i] },
+  { label: "GraphQL", patterns: [/\bgraphql\b/i] },
+  { label: "REST API", patterns: [/\brest\b/i, /\brestful\b/i, /\bapi\b/i] }
+];
+
+const benefitMatchers = [
+  { label: "Remote Work", patterns: [/\bremote\b/i, /\bwork from home\b/i, /\bwfh\b/i] },
+  { label: "Hybrid Work", patterns: [/\bhybrid\b/i] },
+  { label: "Flexible Hours", patterns: [/\bflexible hours\b/i, /\bflex time\b/i, /\bflexible schedule\b/i] },
+  { label: "Health Insurance", patterns: [/\bhealth insurance\b/i, /\bmedical\b/i, /\bdental\b/i, /\bvision\b/i] },
+  { label: "401(k)", patterns: [/\b401\(k\)\b/i, /\bretirement plan\b/i] },
+  { label: "Paid Time Off", patterns: [/\bpaid time off\b/i, /\bpto\b/i, /\bvacation\b/i] },
+  { label: "Parental Leave", patterns: [/\bparental leave\b/i, /\bmaternity leave\b/i, /\bpaternity leave\b/i] },
+  { label: "Equity", patterns: [/\bequity\b/i, /\bstock options\b/i, /\brsu\b/i] },
+  { label: "Bonus", patterns: [/\bbonus\b/i, /\bperformance bonus\b/i] },
+  { label: "Learning Budget", patterns: [/\blearning budget\b/i, /\btraining budget\b/i, /\beducation stipend\b/i] },
+  { label: "Wellness", patterns: [/\bwellness stipend\b/i, /\bmental health\b/i, /\bgym reimbursement\b/i] },
+  { label: "Visa Sponsorship", patterns: [/\bvisa sponsorship\b/i, /\bsponsorship available\b/i] },
+  { label: "Relocation", patterns: [/\brelocation\b/i, /\brelocation assistance\b/i] }
+];
+
+function collectMentions(text, matchers) {
+  const source = String(text || "");
+  const found = [];
+
+  for (const matcher of matchers) {
+    if (matcher.patterns.some((pattern) => pattern.test(source))) {
+      found.push(matcher.label);
+    }
+  }
+
+  return found;
+}
+
+function buildSkillsSummary(context) {
+  const merged = [context?.title, context?.description, context?.company].map((item) => String(item || "")).join("\n");
+  const skills = collectMentions(merged, skillMatchers);
+
+  const section = document.createElement("div");
+  section.id = "easyApplyCopilotSkillsSummary";
+  section.style.marginTop = "8px";
+  section.style.padding = "8px";
+  section.style.background = "#ffffff";
+  section.style.border = "1px solid #111111";
+  section.style.borderRadius = "8px";
+
+  const title = document.createElement("div");
+  title.textContent = "Skills Mentioned";
+  title.style.color = "#111111";
+  title.style.fontSize = "12px";
+  title.style.fontWeight = "700";
+  title.style.marginBottom = "6px";
+  section.appendChild(title);
+
+  const tags = document.createElement("div");
+  tags.style.display = "flex";
+  tags.style.flexWrap = "wrap";
+  tags.style.gap = "4px";
+
+  if (!skills.length) {
+    const empty = document.createElement("div");
+    empty.textContent = "No obvious skill keywords found.";
+    empty.style.color = "#333333";
+    empty.style.fontSize = "12px";
+    tags.appendChild(empty);
+  } else {
+    for (const skill of skills) {
+      const chip = document.createElement("div");
+      chip.textContent = skill;
+      chip.style.background = "#ffffff";
+      chip.style.border = "1px solid #111111";
+      chip.style.color = "#111111";
+      chip.style.padding = "3px 7px";
+      chip.style.borderRadius = "4px";
+      chip.style.fontSize = "12px";
+      chip.style.fontWeight = "600";
+      tags.appendChild(chip);
+    }
+  }
+
+  section.appendChild(tags);
+  return section;
+}
+
+function buildBenefitsSummary(context) {
+  const merged = [context?.title, context?.description, context?.company].map((item) => String(item || "")).join("\n");
+  const benefits = collectMentions(merged, benefitMatchers);
+
+  const section = document.createElement("div");
+  section.id = "easyApplyCopilotBenefitsSummary";
+  section.style.marginTop = "8px";
+  section.style.padding = "8px";
+  section.style.background = "#eef9f0";
+  section.style.border = "1px solid #9fd2a8";
+  section.style.borderRadius = "8px";
+
+  const title = document.createElement("div");
+  title.textContent = "Benefits Mentioned";
+  title.style.color = "#1d5f2e";
+  title.style.fontSize = "12px";
+  title.style.fontWeight = "700";
+  title.style.marginBottom = "6px";
+  section.appendChild(title);
+
+  const tags = document.createElement("div");
+  tags.style.display = "flex";
+  tags.style.flexWrap = "wrap";
+  tags.style.gap = "4px";
+
+  if (!benefits.length) {
+    const empty = document.createElement("div");
+    empty.textContent = "No obvious benefits keywords found.";
+    empty.style.color = "#2f5f38";
+    empty.style.fontSize = "12px";
+    tags.appendChild(empty);
+  } else {
+    for (const benefit of benefits) {
+      const chip = document.createElement("div");
+      chip.textContent = benefit;
+      chip.style.background = "#d7f0dc";
+      chip.style.border = "1px solid #7ab38a";
+      chip.style.color = "#1d5f2e";
+      chip.style.padding = "3px 7px";
+      chip.style.borderRadius = "4px";
+      chip.style.fontSize = "12px";
+      chip.style.fontWeight = "600";
+      tags.appendChild(chip);
+    }
+  }
+
+  section.appendChild(tags);
+  return section;
+}
+
+function renderStaticSummaries(container, context) {
+  if (!container || !container.isConnected) {
+    return;
+  }
+
+  const scam = assessScamSignals(context);
+  container.replaceChildren(
+    buildRisksSummary(scam.signals),
+    buildSkillsSummary(context),
+    buildBenefitsSummary(context)
+  );
+}
+
 function buildRisksSummary(signals) {
   if (!buildRisksSummary.element?.isConnected) {
     const div = document.createElement("div");
@@ -1576,8 +1740,7 @@ function syncLinkedInReviewWidgetState(wrapper) {
   }
 
   wrapper.dataset.easyApplyReviewSig = signature;
-
-  wrapper.appendChild(buildRisksSummary(assessScamSignals(context).signals));
+  renderStaticSummaries(staticBody, context);
 
   const cachedReview = linkedInReviewCache.llmBySignature.get(signature);
   if (cachedReview?.lines?.length) {
@@ -1634,9 +1797,7 @@ function injectLinkedInReviewWidget() {
 
   if (staticBody) {
     const context = extractLinkedInContext();
-    const scam = assessScamSignals(context);
-
-    staticBody.appendChild(buildRisksSummary(scam.signals));
+    renderStaticSummaries(staticBody, context);
   }
 
   if (analyzeBtn && reviewBody) {
