@@ -19,6 +19,7 @@ const STATIC_ANALYSIS_THRESHOLDS = {
 const STATIC_ANALYSIS_WEIGHTS = {
   aiTrainingData: 24,
   knownCompanyFlag: 26,
+  grift: 20,
   candidateQualificationFreeTask: 22,
   timedCandidateTaskUnder60: 12,
   candidateQualificationTask: 8,
@@ -469,7 +470,7 @@ function detectAiDrivenProductClaim(text) {
     "machine learning",
     "llm",
     "generative ai",
-    "genai"
+    "genai",
   ];
 
   const productTerms = [
@@ -485,7 +486,8 @@ function detectAiDrivenProductClaim(text) {
     "ai-powered platform",
     "ai powered platform",
     "ai product",
-    "ai platform"
+    "ai platform",
+    "agentic ai"
   ];
 
   const hasAiReference = includesAny(source, aiTerms);
@@ -502,6 +504,14 @@ function assessScamSignals({ title, company, description, url, ghostAssessment }
   const merged = [title, company, description, url].map((x) => String(x || "")).join("\n");
   const urls = extractUrlsFromText(merged);
   const domains = extractDomains(urls);
+
+  const griftHints = [
+    "gambling",
+    "crypto",
+    "nft",
+    "blockchain",
+    "web3"
+  ];
 
   const aiTrainingHints = [
     "training data",
@@ -531,16 +541,18 @@ function assessScamSignals({ title, company, description, url, ghostAssessment }
     "g2 recruitment",
     "vivid resourcing",
     "enzo tech group",
-    "ngage",
     "asugo",
     "cingalium",
     "onesource consulting",
     "apollo solutions",
-    "interex"
+    "interex",
+    "ec1 partners",
+    "syndi app",
   ];
 
   const domainAi = domains.some((domain) => domain.endsWith(".ai"));
-  const knownCompanyMention = includesAny(merged, knownQuestionableCompanies);
+  const knownCompanyMention = includesAny(merged, knownQuestionableCompanies) || ["talent", "ngage"].some((needle) => company.toLowerCase() === needle);
+  const griftSignal = includesAny(merged, griftHints);
   const aiTrainingDataSignal = includesAny(merged, aiTrainingHints);
   const referralHarvestingSignal = includesAny(merged, referralHarvestHints);
   const automatedAiInterviewingStepSignal = includesAny(merged, [
@@ -554,7 +566,9 @@ function assessScamSignals({ title, company, description, url, ghostAssessment }
     "bot interview",
     "automated screening",
     "ai screening",
-    "ai to match"
+    "ai to match",
+    "ai recruit",
+    "ai recruiter",
   ]);
   const impossibleRoleSignal = includesAny(title, ["nuclear reactor operator", "air traffic controller", "surgeon"]) && includesAny(title, ["remote"]);
   const compensationOutlierSignal = detectCompensationOutlier(merged);
@@ -592,6 +606,7 @@ function assessScamSignals({ title, company, description, url, ghostAssessment }
     aiTrainingData: aiTrainingDataSignal,
     aiDrivenProduct: aiDrivenProductSignal,
     automatedAiInterviewingStep: automatedAiInterviewingStepSignal,
+    grift: griftSignal,
     candidateQualificationTask: candidateQualificationTaskSignal,
     timedCandidateTaskUnder60: timedCandidateTaskUnder60Signal,
     candidateQualificationFreeTask: candidateQualificationFreeTaskSignal,
@@ -649,6 +664,9 @@ function buildHardAvoidReason(scam) {
   if (scam.signals.knownCompanyFlag) {
     reasons.push("flagged company mention");
   }
+  if (scam.signals.grift) {
+    reasons.push("grift signal");
+  }
   if (scam.signals.candidateQualificationFreeTask) {
     reasons.push("timed free qualification task");
   }
@@ -660,29 +678,17 @@ function buildHardAvoidReason(scam) {
 
 function findDismissButton(card) {
   const selectors = [
-    "button[aria-label*='dismiss']",
-    "button[aria-label*='not interested']",
-    "button[aria-label*='hide']",
-    "button[aria-label*='remove']",
-    "button[aria-label*='Dismiss']",
-    "button[aria-label*='Not interested']",
-    "button[aria-label*='Hide']",
-    "button[aria-label*='Remove']"
+    "button svg use[href*='close']",
   ];
 
   for (const selector of selectors) {
     const button = card.querySelector(selector);
     if (button) {
-      return button;
+      return button.parentElement.parentElement;
     }
   }
 
-  const textMatch = Array.from(card.querySelectorAll("button, [role='button']")).find((el) => {
-    const label = cleanText(el.textContent || el.getAttribute("aria-label") || "").toLowerCase();
-    return ["dismiss", "not interested", "hide", "remove"].some((needle) => label.includes(needle));
-  });
-
-  return textMatch || null;
+  return null
 }
 
 function isAlreadyAppliedCard(card, context) {
@@ -715,6 +721,34 @@ function isAlreadyAppliedCard(card, context) {
   ].some((needle) => merged.includes(needle));
 }
 
+function isDismissed(card, context) {
+  const selectors = [
+    ".job-card-container__footer-job-state",
+    ".job-card-container__applied-text",
+    ".job-card-list__footer-wrapper",
+    ".artdeco-entity-lockup__caption",
+    ".job-card-container__footer-item--highlighted"
+  ];
+
+  const selectorText = selectors
+    .map((selector) => cleanText(card.querySelector(selector)?.textContent || ""))
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const merged = [
+    cleanText(context?.title),
+    cleanText(context?.company),
+    cleanText(context?.description),
+    selectorText,
+    cleanText(card.textContent || "")
+  ].join(" ").toLowerCase();
+
+  return [
+    "show you this job again",
+  ].some((needle) => merged.includes(needle));
+}
+
 function animateAndDismissAppliedCard(card) {
   if (card.dataset.easyApplyDismissState === "done" || card.dataset.easyApplyDismissState === "running") {
     return;
@@ -726,7 +760,7 @@ function animateAndDismissAppliedCard(card) {
   const dismissButton = findDismissButton(card);
   const overlay = document.createElement("div");
   overlay.className = DISMISS_OVERLAY_CLASS;
-  overlay.textContent = "Auto-dismissing already applied job";
+  overlay.textContent = "Auto-dismissing job";
   overlay.style.position = "absolute";
   overlay.style.inset = "0";
   overlay.style.display = "flex";
@@ -820,6 +854,7 @@ function animateAndDismissFlaggedCard(card, reasonText) {
     card.style.display = "none";
 
   }, { once: true });
+  card.remove()
 }
 
 function buildContextSignature(context) {
@@ -938,25 +973,19 @@ function runLinkedInListStaticScan() {
       continue;
     }
 
-    const scam = assessScamSignals(context);
-    recordStaticAssessmentTelemetry(signature, context, scam, "list");
-
-    if (isAlreadyAppliedCard(card, context)) {
+    if (isAlreadyAppliedCard(card, context) || isDismissed(card, context)) {
       animateAndDismissAppliedCard(card);
-      card.dataset.easyApplyScamSig = signature;
       continue;
     }
+
+    const scam = assessScamSignals(context);
+    recordStaticAssessmentTelemetry(signature, context, scam, "list");
 
     if (scam.decision?.action === "dismiss") {
       animateAndDismissFlaggedCard(card, buildHardAvoidReason(scam));
       card.dataset.easyApplyScamSig = signature;
       continue;
     }
-
-    const shouldCover = Boolean(scam.decision?.action === "cover");
-    const reason = buildHardAvoidReason(scam);
-    setCoveredState(card, shouldCover, `Avoided: ${reason}`);
-    card.dataset.easyApplyScamSig = signature;
     } catch {
       // Ignore per-card errors so one malformed card does not break the whole scan.
     }
@@ -983,11 +1012,7 @@ function runLinkedInPreviewStaticScan() {
   }
 
   const scam = assessScamSignals(context);
-  recordStaticAssessmentTelemetry(signature, context, scam, "preview");
-  const shouldCover = Boolean(scam.decision?.action === "cover" || scam.decision?.action === "dismiss");
-  const reason = buildHardAvoidReason(scam);
-  setCoveredState(previewRoot, shouldCover, `Avoided: ${reason}`);
-  previewRoot.dataset.easyApplyScamSig = signature;
+  recordStaticAssessmentTelemetry(signature, context, scam, "preview")
   } catch {
     // Keep scanner alive if preview extraction temporarily fails during LinkedIn rerenders.
   }
@@ -1334,7 +1359,8 @@ const riskStrings = {
   referralHarvesting: "Referral Harvesting",
   externalInterviewRedirect: "External Interview Redirect",
   impossibleRole: "Impossible Role Pattern",
-  highCompOutlier: "Compensation Outlier"
+  highCompOutlier: "Compensation Outlier",
+  grift: "Grift (Gambling/Blockchain)",
 }
 
 function buildRisksSummary(signals) {
@@ -1624,7 +1650,7 @@ function injectLinkedInReviewWidget() {
   syncLinkedInReviewWidgetState(wrapper);
 }
 
-function initInlineReviewWidget() {
+async function initInlineReviewWidget() {
   if (!location.hostname.includes("linkedin.com")) {
     return;
   }
@@ -1632,23 +1658,60 @@ function initInlineReviewWidget() {
   injectLinkedInReviewWidget();
   runLinkedInScamCoverPass();
 
-  let timer = null;
+  const container = await untilAppears(".jobs-description__container");
+
+  let wrapper = document.getElementById(REVIEW_WIDGET_ID);
+  if (!wrapper) {
+    injectLinkedInReviewWidget();
+    wrapper = document.getElementById(REVIEW_WIDGET_ID);
+  }
+
   const observer = new MutationObserver(() => {
-    if (timer) {
-      clearTimeout(timer);
-    }
-    timer = setTimeout(() => {
-      let wrapper = document.getElementById(REVIEW_WIDGET_ID);
-      if (!wrapper) {
-        injectLinkedInReviewWidget();
-        wrapper = document.getElementById(REVIEW_WIDGET_ID);
-      }
-      syncLinkedInReviewWidgetState(wrapper);
-      runLinkedInScamCoverPass();
-    }, 250);
+    syncLinkedInReviewWidgetState(wrapper);
+    runLinkedInScamCoverPass();
   });
 
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  observer.observe(container, { attributes: true, childList: true, subtree: true });
+}
+
+
+new MutationObserver(() => {
+  if (!location.hostname.includes("linkedin.com")) return;
+
+  closeUselessLinkedInPopups()
+}).observe(document.body, { childList: true, subtree: true });
+
+function closeUselessLinkedInPopups() {
+  // Application sent
+  // Added to your applied jobs
+  
+  // const modalContainer = document.querySelector("#artdeco-modal-outlet > *:not(.jobs-easy-apply-modal)")
+  // if (modalContainer.childNodes.length > 0) findDismissButton(modalContainer)?.click()
+}
+
+function untilAppears(selector, timeout = 15_000) {
+  return new Promise((resolve, reject) => {
+    const element = document.querySelector(selector);
+    if (element) {
+      resolve(element);
+      return;
+    }
+
+    const observer = new MutationObserver(() => {
+      const el = document.querySelector(selector);
+      if (el) {
+        observer.disconnect();
+        resolve(el);
+      }
+    });
+
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+
+    setTimeout(() => {
+      observer.disconnect();
+      reject(new Error(`Element ${selector} did not appear within ${timeout}ms`));
+    }, timeout);
+  });
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
