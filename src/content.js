@@ -1305,10 +1305,9 @@ function buildReviewWidgetHtml() {
   return `
     <div class="artdeco-card" style="border:1px solid #d5deea;border-radius:12px;padding:12px;background:#f8fbff;margin:12px 0;font-family:inherit;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-weight:700;font-size:14px;color:#0a66c2;">Easy Apply Copilot</div>
+        <div style="font-weight:700;font-size:14px;color:#0a66c2;">LinkedIn Copilot</div>
       </div>
-      <div id="easyApplyCopilotResumePanel" style="margin-top:10px;padding:10px;border:1px solid #dce6f1;border-radius:10px;background:#ffffff;">
-        <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:8px;">Tailored Resume Panel</div>
+      <div id="easyApplyCopilotResumePanel" style="margin-top:10px;">
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button id="easyApplyCopilotAnalyzeBtn" class="artdeco-button artdeco-button--2 artdeco-button--secondary" style="cursor:pointer;font-weight:600;">Analyze Job</button>
           <button id="easyApplyCopilotGenerateBtn" class="artdeco-button artdeco-button--2 artdeco-button--primary" style="cursor:pointer;font-weight:600;" disabled>Generate Tailored Resume</button>
@@ -1681,30 +1680,43 @@ function renderStaticSummaries(container, context) {
 
   const scam = assessScamSignals(context);
   container.replaceChildren(
-    buildRisksSummary(scam.signals),
     buildSkillsSummary(context),
-    buildBenefitsSummary(context)
+    buildBenefitsSummary(context),
+    buildRisksSummary(scam.signals),
   );
 }
 
 function buildRisksSummary(signals) {
   if (!buildRisksSummary.element?.isConnected) {
-    const div = document.createElement("div");
-    div.id = "easyApplyCopilotRisksSummary";
-    div.style.display = "flex";
-    div.style.flexWrap = "wrap";
-    div.style.gap = "4px";
-    div.style.marginTop = "8px";
-    div.style.padding = "16px 24px";
-    div.style.background = "#fff1f0";
-    div.style.border = "1px solid #f5c2c7";
-    div.style.borderRadius = "8px";
+    const section = document.createElement("div");
+    section.id = "easyApplyCopilotRisksSummary";
+    section.style.marginTop = "8px";
+    section.style.padding = "8px";
+    section.style.background = "#fff1f0";
+    section.style.border = "1px solid #f5c2c7";
+    section.style.borderRadius = "8px";
+
+    const title = document.createElement("div");
+    title.textContent = "Risk Signals";
+    title.style.color = "#706969";
+    title.style.fontSize = "12px";
+    title.style.fontWeight = "700";
+    title.style.marginBottom = "6px";
+    section.appendChild(title);
+
+    const tags = document.createElement("div");
+    tags.dataset.role = "risk-tags";
+    tags.style.display = "flex";
+    tags.style.flexWrap = "wrap";
+    tags.style.gap = "4px";
+    section.appendChild(tags);
   
-    buildRisksSummary.element = div;
+    buildRisksSummary.element = section;
   }
 
-  const div = buildRisksSummary.element;
-  div.textContent = "";
+  const section = buildRisksSummary.element;
+  const tags = section.querySelector("[data-role='risk-tags']") || section;
+  tags.textContent = "";
 
   for (const [signal, active] of Object.entries(signals)) {
     if (active === false) continue
@@ -1718,25 +1730,24 @@ function buildRisksSummary(signals) {
     signalDiv.style.fontSize = "12px";
     signalDiv.style.fontWeight = "600";
 
-    div.appendChild(signalDiv);
+    tags.appendChild(signalDiv);
   }
 
-  if (div.children.length === 0) {
-    div.style.background = "transparent";
-    div.style.border = "1px solid #eaeaea";
+  if (tags.children.length === 0) {
+    section.style.background = "#ffffff";
+    section.style.border = "1px solid #eaeaea";
 
     const noRiskDiv = document.createElement("div");
     noRiskDiv.textContent = "No obvious risks found";
     noRiskDiv.style.color = "#444";
     noRiskDiv.style.fontSize = "12px";
-    noRiskDiv.style.fontWeight = "600";
-    div.appendChild(noRiskDiv);
+    tags.appendChild(noRiskDiv);
   } else {
-    div.style.background = "#fff1f0";
-    div.style.border = "1px solid #f5c2c7";
+    section.style.background = "#fff1f0";
+    section.style.border = "1px solid #f5c2c7";
   }
 
-  return div;
+  return section;
 }
 
 async function runLinkedInInlineReview(wrapper, bodyEl) {
@@ -2034,6 +2045,36 @@ function untilAppears(selector, timeout = 15_000) {
     }, timeout);
   });
 }
+
+/**
+ * Calls `callback(element)` each time `selector` appears (or reappears) in the DOM.
+ * Resets after the matched element is removed so the callback fires again on the next appearance.
+ * Returns a function that stops watching.
+ */
+function watchFor(selector, callback, root = document.documentElement) {
+  let present = false;
+
+  function check() {
+    const el = document.querySelector(selector);
+    if (el && !present) {
+      present = true;
+      callback(el);
+    } else if (!el && present) {
+      present = false;
+    }
+  }
+
+  check();
+
+  const observer = new MutationObserver(check);
+  observer.observe(root, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}
+
+watchFor(
+  "#artdeco-modal-outlet input[type='checkbox']",
+  () => maybeUnfollowStayUpToDate()
+);
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   try {
