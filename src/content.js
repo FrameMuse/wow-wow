@@ -43,6 +43,44 @@ const linkedInReviewCache = {
   analyzedBySignature: new Set()
 };
 
+// Saved on contextmenu so background-triggered replacements know which element and range to target.
+let pendingFieldSelection = null;
+
+document.addEventListener("contextmenu", (event) => {
+  const target = event.target;
+  const el =
+    target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+      ? target
+      : null;
+
+  if (!el) {
+    pendingFieldSelection = null;
+    return;
+  }
+
+  const labelEl = el.id
+    ? document.querySelector(`label[for='${CSS.escape(el.id)}']`)
+    : null;
+
+  const label = cleanText(
+    [
+      labelEl?.textContent,
+      el.getAttribute("aria-label"),
+      el.getAttribute("placeholder"),
+      el.getAttribute("name")
+    ]
+      .filter(Boolean)
+      .join(" ")
+  );
+
+  pendingFieldSelection = {
+    element: el,
+    selectionStart: el.selectionStart,
+    selectionEnd: el.selectionEnd,
+    label
+  };
+});
+
 function ensureRelativePosition(element) {
   const computed = getComputedStyle(element).position;
   if (computed === "static") {
@@ -535,8 +573,8 @@ function assessScamSignals({ title, company, description, url, ghostAssessment }
   ];
 
   const knownQuestionableCompanies = [
-    "mercor", 
-    "micro1", 
+    "mercor",
+    "micro1",
     "crossing hurdles",
     "g2 recruitment",
     "vivid resourcing",
@@ -895,10 +933,10 @@ function getSelectedLinkedInJobKey() {
   ]);
   const detailHref = detailRoot
     ? firstElement([
-        ".jobs-unified-top-card__content a[href*='/jobs/view/']",
-        ".job-details-jobs-unified-top-card__job-title a[href*='/jobs/view/']",
-        ".jobs-unified-top-card__job-title a[href*='/jobs/view/']"
-      ], detailRoot)?.href || ""
+      ".jobs-unified-top-card__content a[href*='/jobs/view/']",
+      ".job-details-jobs-unified-top-card__job-title a[href*='/jobs/view/']",
+      ".jobs-unified-top-card__job-title a[href*='/jobs/view/']"
+    ], detailRoot)?.href || ""
     : "";
 
   const selectedFromDetail = extractLinkedInJobKeyFromUrl(detailHref);
@@ -962,30 +1000,30 @@ function runLinkedInListStaticScan() {
 
   for (const card of cards) {
     try {
-    if (card.dataset.easyApplyDismissState === "running") {
-      continue;
-    }
+      if (card.dataset.easyApplyDismissState === "running") {
+        continue;
+      }
 
-    const context = extractLinkedInCardContext(card);
-    const signature = buildContextSignature(context);
+      const context = extractLinkedInCardContext(card);
+      const signature = buildContextSignature(context);
 
-    if (card.dataset.easyApplyScamSig === signature) {
-      continue;
-    }
+      if (card.dataset.easyApplyScamSig === signature) {
+        continue;
+      }
 
-    if (isAlreadyAppliedCard(card, context) || isDismissed(card, context)) {
-      animateAndDismissAppliedCard(card);
-      continue;
-    }
+      if (isAlreadyAppliedCard(card, context) || isDismissed(card, context)) {
+        animateAndDismissAppliedCard(card);
+        continue;
+      }
 
-    const scam = assessScamSignals(context);
-    recordStaticAssessmentTelemetry(signature, context, scam, "list");
+      const scam = assessScamSignals(context);
+      recordStaticAssessmentTelemetry(signature, context, scam, "list");
 
-    if (scam.decision?.action === "dismiss") {
-      animateAndDismissFlaggedCard(card, buildHardAvoidReason(scam));
-      card.dataset.easyApplyScamSig = signature;
-      continue;
-    }
+      if (scam.decision?.action === "dismiss") {
+        animateAndDismissFlaggedCard(card, buildHardAvoidReason(scam));
+        card.dataset.easyApplyScamSig = signature;
+        continue;
+      }
     } catch {
       // Ignore per-card errors so one malformed card does not break the whole scan.
     }
@@ -994,25 +1032,25 @@ function runLinkedInListStaticScan() {
 
 function runLinkedInPreviewStaticScan() {
   try {
-  const previewRoot = firstElement([
-    ".jobs-search__job-details--container",
-    ".jobs-details",
-    ".job-view-layout"
-  ]);
+    const previewRoot = firstElement([
+      ".jobs-search__job-details--container",
+      ".jobs-details",
+      ".job-view-layout"
+    ]);
 
-  if (!previewRoot) {
-    return;
-  }
+    if (!previewRoot) {
+      return;
+    }
 
-  const context = extractLinkedInContext();
-  const signature = buildContextSignature(context);
+    const context = extractLinkedInContext();
+    const signature = buildContextSignature(context);
 
-  if (previewRoot.dataset.easyApplyScamSig === signature) {
-    return;
-  }
+    if (previewRoot.dataset.easyApplyScamSig === signature) {
+      return;
+    }
 
-  const scam = assessScamSignals(context);
-  recordStaticAssessmentTelemetry(signature, context, scam, "preview")
+    const scam = assessScamSignals(context);
+    recordStaticAssessmentTelemetry(signature, context, scam, "preview")
   } catch {
     // Keep scanner alive if preview extraction temporarily fails during LinkedIn rerenders.
   }
@@ -1131,47 +1169,15 @@ function fillKnownFields(applicationAnswers) {
 }
 
 function maybeUnfollowStayUpToDate() {
-  let uncheckedCount = 0;
-  const candidates = Array.from(document.querySelectorAll("input[type='checkbox']"));
+  const checkbox = document.getElementById("follow-company-checkbox")
+  if (checkbox == null) return
+  if (!checkbox.checked || checkbox.disabled) return
 
-  for (const checkbox of candidates) {
-    if (!checkbox.checked || checkbox.disabled) {
-      continue;
-    }
-
-    const labelFromFor = checkbox.id
-      ? document.querySelector(`label[for='${CSS.escape(checkbox.id)}']`)
-      : null;
-    const labelText = cleanText(
-      [
-        labelFromFor?.textContent,
-        checkbox.closest("label")?.textContent,
-        checkbox.getAttribute("aria-label"),
-        checkbox.getAttribute("name")
-      ].filter(Boolean).join(" ")
-    ).toLowerCase();
-
-    const isFollowToggle = [
-      "stay up to date",
-      "job updates",
-      "follow",
-      "company updates",
-      "update emails"
-    ].some((needle) => labelText.includes(needle));
-
-    if (!isFollowToggle) {
-      continue;
-    }
-
-    checkbox.click();
-    uncheckedCount += 1;
-  }
-
-  return uncheckedCount;
+  checkbox.click();
 }
 
 function clickProgressButtons({ allowAutoSubmit }) {
-  const progressMatchers = ["next", "continue", "review", "submit application", "apply", "send"]; 
+  const progressMatchers = ["next", "continue", "review", "submit application", "apply", "send"];
   let buttonsClicked = 0;
 
   for (const matcher of progressMatchers) {
@@ -1710,7 +1716,7 @@ function buildRisksSummary(signals) {
     tags.style.flexWrap = "wrap";
     tags.style.gap = "4px";
     section.appendChild(tags);
-  
+
     buildRisksSummary.element = section;
   }
 
@@ -2016,7 +2022,7 @@ new MutationObserver(() => {
 function closeUselessLinkedInPopups() {
   // Application sent
   // Added to your applied jobs
-  
+
   // const modalContainer = document.querySelector("#artdeco-modal-outlet > *:not(.jobs-easy-apply-modal)")
   // if (modalContainer.childNodes.length > 0) findDismissButton(modalContainer)?.click()
 }
@@ -2072,7 +2078,7 @@ function watchFor(selector, callback, root = document.documentElement) {
 }
 
 watchFor(
-  "#artdeco-modal-outlet input[type='checkbox']",
+  "#follow-company-checkbox",
   () => maybeUnfollowStayUpToDate()
 );
 
@@ -2118,6 +2124,59 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         ok: true,
         data: { attachedResume, fieldsFilled, buttonsClicked, stayUpToDateUnchecked }
       });
+      return;
+    }
+
+    if (message.type === "resume-get-field-context") {
+      sendResponse({ ok: true, label: pendingFieldSelection?.label || "" });
+      return;
+    }
+
+    if (message.type === "resume-text-replace") {
+      const saved = pendingFieldSelection;
+      pendingFieldSelection = null;
+
+      if (!saved?.element?.isConnected) {
+        sendResponse({ ok: false, error: "Field element is no longer in the document." });
+        return;
+      }
+
+      const { element, selectionStart, selectionEnd } = saved;
+      const before = element.value.slice(0, selectionStart);
+      const after = element.value.slice(selectionEnd);
+      element.value = before + message.newText + after;
+      element.selectionStart = selectionStart;
+      element.selectionEnd = selectionStart + message.newText.length;
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+      element.focus();
+
+      sendResponse({ ok: true });
+      return;
+    }
+
+    if (message.type === "resume-text-error") {
+      pendingFieldSelection = null;
+      sendResponse({ ok: true });
+      // Surface the error without blocking the page
+      const toast = document.createElement("div");
+      toast.textContent = `[Resume] ${message.error}`;
+      Object.assign(toast.style, {
+        position: "fixed",
+        bottom: "24px",
+        right: "24px",
+        zIndex: "2147483647",
+        padding: "10px 16px",
+        borderRadius: "6px",
+        fontSize: "13px",
+        fontWeight: "500",
+        color: "#fff",
+        background: "#c0392b",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+        pointerEvents: "none"
+      });
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 5000);
       return;
     }
 

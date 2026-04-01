@@ -3,7 +3,7 @@
   "name": "LinkedIn Copilot",
   "description": "Analyze jobs, tailor a resume from your experience, and assist with Easy Apply workflows.",
   "version": "0.1.0",
-  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "permissions": ["storage", "activeTab", "scripting", "tabs", "contextMenus"],
   "host_permissions": [
     "https://*.linkedin.com/*",
     "https://*.indeed.com/*",

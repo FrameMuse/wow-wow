@@ -316,6 +316,74 @@ async function getApplicationPayload(assistOverrides = {}) {
   };
 }
 
+async function llmTextCall({ bridgeUrl, githubToken, model, action, selectionText, label }) {
+  const labelContext = label ? `Field: "${label}"\n\n` : "";
+
+  const systemPrompt =
+    action === "resume-improve"
+      ? 'You are a professional resume and job application writer. Improve the provided text to be more professional, impactful, and concise. Return JSON: {"text": "<improved text>"}. Output only the JSON, no explanations.'
+      : 'You are a professional resume and job application writer. Continue and complete the provided text naturally and professionally. Return JSON: {"text": "<full completed text including the original start>"}. Output only the JSON, no explanations.';
+
+  const userPrompt = `${labelContext}${action === "resume-improve" ? "Improve" : "Complete"} this text:\n\n${selectionText}`;
+
+  const result = await llmJsonCall({ bridgeUrl, githubToken, model, systemPrompt, userPrompt });
+  const text = result?.text;
+
+  if (!text || typeof text !== "string") {
+    throw new Error("LLM returned an empty or invalid text result.");
+  }
+
+  return text;
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "resume-improve",
+    title: "[Resume] Improve",
+    contexts: ["editable"]
+  });
+  chrome.contextMenus.create({
+    id: "resume-autocomplete",
+    title: "[Resume] Autocomplete",
+    contexts: ["editable"]
+  });
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (!tab?.id || !["resume-improve", "resume-autocomplete"].includes(String(info.menuItemId))) {
+    return;
+  }
+
+  const selectionText = info.selectionText?.trim();
+  if (!selectionText) {
+    return;
+  }
+
+  try {
+    let label = "";
+    try {
+      const ctx = await chrome.tabs.sendMessage(tab.id, { type: "resume-get-field-context" });
+      label = ctx?.label || "";
+    } catch {
+      // content script may not be available on this tab
+    }
+
+    const settings = await getSettings({ requireResumeSource: false });
+    const newText = await llmTextCall({
+      bridgeUrl: settings.bridgeUrl,
+      githubToken: settings.githubToken,
+      model: settings.model,
+      action: String(info.menuItemId),
+      selectionText,
+      label
+    });
+
+    await chrome.tabs.sendMessage(tab.id, { type: "resume-text-replace", newText });
+  } catch (error) {
+    chrome.tabs.sendMessage(tab.id, { type: "resume-text-error", error: error.message }).catch(() => {});
+  }
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     if (message.type === "analyze-job-fit") {
